@@ -4,59 +4,45 @@ import google.generativeai as genai
 # --- 1. 页面极简配置 ---
 st.set_page_config(page_title="灵感实验室", layout="centered")
 
-# 自定义样式：蓝色大按钮
-st.markdown("""
-    <style>
-    .stButton>button {
-        width: 100%; border-radius: 15px; height: 3.5em;
-        background-color: #007AFF; color: white; font-weight: bold;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 2. 安全读取 Key（增加自动去空格功能，杀灭 400 错误） ---
-def init_model():
+# --- 2. 安全读取与自动清理 (杀灭所有 Key 报错) ---
+def init_brain():
     if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("❌ 请在 Streamlit 控制台配置 Secrets")
+        st.error("❌ 还没在 Secrets 里找到钥匙呢！")
         return None
     try:
-        # 核心修复点：使用 .strip() 彻底删除复制 Key 时可能带上的隐形空格
-        key = st.secrets["GOOGLE_API_KEY"].strip().strip('"').strip("'")
-        genai.configure(api_key=key)
-        # 修复 404 错误：直接指定模型名称
+        # 核心修复：.strip() 会删掉所有看不见的空格，replace 会删掉多余引号
+        raw_key = st.secrets["GOOGLE_API_KEY"].strip().replace('"', '').replace("'", "")
+        genai.configure(api_key=raw_key)
+        # 强制指定最稳的模型
         return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"大脑配置失败：{e}")
+        st.error(f"🧠 大脑初始化挂了: {e}")
         return None
 
-model = init_model()
+model = init_brain()
 
 # --- 3. 界面设计 ---
 st.title("🧠 灵感提炼实验室")
 
-with st.sidebar:
-    st.title("🗂️ 分类管理")
-    category = st.selectbox("记录至：", ["随想灵感", "读书笔记", "工作复盘"])
-    st.info("提示：直接点击手机键盘话筒即可语音输入。")
-
-user_input = st.text_area("输入你的观点：", placeholder="在此输入你的感悟...", height=200)
+user_input = st.text_area("输入你的想法：", placeholder="今天有什么新发现？", height=250)
 
 if st.button("✨ 立即智能提炼"):
     if not user_input.strip():
-        st.warning("写点什么再提炼吧！")
+        st.warning("请先写点什么吧！")
     elif not model:
-        st.error("AI 引擎未就绪，请检查 Secrets 配置。")
+        st.error("AI 引擎没准备好，检查一下钥匙。")
     else:
-        with st.spinner('正在提炼中...'):
+        with st.spinner('AI 正在接入神经元...'):
             try:
-                # 使用最直接的提炼指令
-                response = model.generate_content(f"你是一个知识专家，请提炼以下内容的逻辑要点和深度延展：{user_input}")
-                st.markdown("---")
-                st.success("提炼成功！")
-                st.write(response.text)
-                st.balloons() # 成功特效
+                # 极其简单的指令，降低出错率
+                response = model.generate_content(f"请提炼以下内容的逻辑要点：{user_input}")
+                if response:
+                    st.markdown("---")
+                    st.subheader("📝 提炼结果")
+                    st.success(response.text)
+                    st.balloons()
             except Exception as e:
-                st.error("提炼失败了，这通常是 API Key 填写错误。")
-                st.info(f"详细报错：{str(e)}")
+                st.error("提炼失败了...")
+                st.info(f"详细诊断: {str(e)}")
 
-st.caption(f"当前分类：{category} | Designed by Kary")
+st.caption("Designed by Kary | Powered by Gemini 1.5 Flash")
